@@ -1,5 +1,4 @@
-SDN Launcher
-============
+# SDN Launcher
 
 In this work, we will utilize the SAVI testbed alongside a software 
 defined switch (OpenVSwitch) to dynamically create network topologies 
@@ -16,24 +15,23 @@ deploying a large scale OpenFlow network in order to test a SDN controller
 and application to running a large scale distributed application on a 
 desired topology.
 
-Usage
-=====
+## Usage
 
-Credentials
------------
-    1. Make a copy of the config.py.example file and call it config.py
-    2. Open the file and specify your savi username and password
+### Credentials
+    
+Make a copy of the config.py.example file and call it config.py
+Open the file and specify your savi username and password
         by changing the value of the variables **user** and **password**
         E.x. 
             **user = "your_username"**
             **password = "your_password"**
-    3. Specify your **keypair name** and **private key path** by changing the 
+Specify your **keypair name** and **private key path** by changing the 
         values of variables **private_key_file** and **key_name**.
-    4. Optionally, change the tenant and region name.
-    5. Save and close the file.
+Optionally, change the tenant and region name.
+Save and close the file.
 
-Specifying Topology
--------------------
+### Specifying Topology
+    
     1. Modify the topology file.
     2. Specify the controller IP address and port number for the **cont_addr**
         variable as a colon separated string.
@@ -66,13 +64,11 @@ topology["sw3"] = ['sw2', ('h3','192.168.200.12')]
         its private IP address (i.e. its 192.168... address) 
         
 
-Cleaning Up
------------
+### Cleaning Up
 
 To cleanup, call the cleanup script: **cleanup.py**.
 
-Contact
-=======
+##Contact
 Khashayar Hossein Zadeh, 
 Email <k.hosseinzadeh@mail.utoronto.ca>
 
