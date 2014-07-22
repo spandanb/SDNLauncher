@@ -19,15 +19,23 @@ desired topology.
 
 ### Credentials
     
-Make a copy of the config.py.example file and call it config.py..
+Make a copy of the config.py.example file and call it config.py...
+
+
 Open the file and specify your savi username and password
         by changing the value of the variables **user** and **password**
         E.x. 
             **user = "your_username"**
             **password = "your_password"**
+
+
 Specify your **keypair name** and **private key path** by changing the 
         values of variables **private_key_file** and **key_name**.
+
+
 Optionally, change the tenant and region name.
+
+
 Save and close the file.
 
 ### Specifying Topology
