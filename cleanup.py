@@ -35,7 +35,7 @@ from topology import topology, nodes
 from config import region_name
 from config import user, password, auth_url, instance_name, tenant_name
 
-if sys.argv[1]:
+if len(sys.argv) > 1:
     instance_name = sys.argv[1] 
 
 regionlist = []

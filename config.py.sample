@@ -20,11 +20,18 @@ auth_url='http://iam.savitestbed.ca:5000/v2.0/'
 region_name = 'CORE'
 tenant_name = 'ualberta'
 
+#Prefix, appended to instance names
 instance_name="OVS_demo_"
-key_name="khash"
-private_key_file="/home/savitb/khash/.ssh/id_rsa"
+
+#key pair name
+key_name=''
+
+#private and public key file path
+#Example private key file path: '/home/savitb/user1/.ssh/id_rsa'
+private_key_file=''
 pub_key=private_key_file+".pub"
 
+#default instance properties
 image_name="image-3.0.1"
 flavor_name="m1.tiny"
 sec_group_name="default"
