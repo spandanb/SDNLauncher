@@ -19,13 +19,12 @@ desired topology.
 
 ### Credentials
     
-Make a copy of the config.py.example file and call it config.py...
+Make a copy of the config.py.example file and call it config.py.
 
 
-Open the file and specify your savi username and password
-        by changing the value of the variables **user** and **password**
-        E.x. 
-            **user = "your_username"**
+Open the file and specify your savi username and password by changing the value of the variables **user** and **password**
+...E.x. 
+....**user = "your_username"**
             **password = "your_password"**
 
 
