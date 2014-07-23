@@ -31,12 +31,13 @@ bridge_name = bridge name for that switch
 
 :%s/CORE/CORE/g
 """
-
+#Address and port pair of controller, e.g. Pox, Ryu, Floodlight 
+contr_addr = '10.12.11.26:6633'
 
 nodes = {}
-nodes["sw1"] = {'contr_addr':'10.12.11.26:6633', 'region':'CORE', 'flavor': 'm1.small', 'bridge_name': 'sw1_br', 'int_ip':('p1', '192.168.200.18')}
-nodes["sw2"] = {'contr_addr':'10.12.11.26:6633', 'region':'CORE', 'flavor': 'm1.small'}
-nodes["sw3"] = {'contr_addr':'10.12.11.26:6633', 'region':'CORE', 'flavor': 'm1.small', 'bridge_name': 'sw3_br'}
+nodes["sw1"] = {'contr_addr': contr_addr, 'region':'CORE', 'flavor': 'm1.small', 'bridge_name': 'sw1_br', 'int_ip':('p1', '192.168.200.18')}
+nodes["sw2"] = {'contr_addr': contr_addr, 'region':'CORE', 'flavor': 'm1.small'}
+nodes["sw3"] = {'contr_addr': contr_addr, 'region':'CORE', 'flavor': 'm1.small', 'bridge_name': 'sw3_br'}
 nodes["h1"] = {'region':'CORE', 'flavor': 'm1.tiny'}
 nodes["h2"] = {'region':'CORE', 'flavor': 'm1.tiny'}
 nodes["h3"] = {'region':'CORE', 'flavor': 'm1.tiny'}
