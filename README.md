@@ -21,9 +21,9 @@ desired topology.
     
     1. Make a copy of the config.py.example file and call it config.py.
     2. Open the file and specify your savi username and password by changing the value of the variables **user** and **password** 
-    ...    E.x. 
-    ...     user = "your_username"
-    ...     password = "your_password"
+         E.x. 
+            user = "your_username"
+            password = "your_password"
 
 
     3. Specify your **keypair name** and **private key path** by changing the 
