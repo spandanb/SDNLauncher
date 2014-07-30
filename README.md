@@ -65,16 +65,15 @@ topology["sw2"] = ['sw1', ('h2', '192.168.200.11')]
 topology["sw3"] = ['sw2', ('h3','192.168.200.12')]
 ```
 
-    5. Test by SSHing to a host and pinging another host on 
-        its private IP address (i.e. its 192.168... address) 
-        
-
 ### Running SDN Launcher
 To run the SDN Launch, run the following command, in this directory:
 ```python
 ./SDNLauncher
 ```
 
+ Test by SSHing to a host and pinging another host on 
+        its private IP address (i.e. its 192.168... address) 
+        
 ### Cleaning Up
 
 To cleanup, call the cleanup script: **cleanup.py**.
