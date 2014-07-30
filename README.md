@@ -69,6 +69,12 @@ topology["sw3"] = ['sw2', ('h3','192.168.200.12')]
         its private IP address (i.e. its 192.168... address) 
         
 
+### Running SDN Launcher
+To run the SDN Launch, run the following command, in this directory:
+```python
+./SDNLauncher
+```
+
 ### Cleaning Up
 
 To cleanup, call the cleanup script: **cleanup.py**.
