@@ -30,10 +30,18 @@ desired topology.
         values of variables **private_key_file** and **key_name**.
 
 
-    4. Optionally, change the tenant and region name.
+    4. Optionally, change the default image name, tenant and region name.
 
 
     5. Save and close the file.
+
+### OF Controller VM
+
+Create a VM that can host OF controller. Example below shows how to get a VM that has all major open-source controllers (Ryu, ODL, Floodlight, etc). This image is built on SDN tutorial image from http://sdnhub.org/tutorials/sdn-tutorial-vm/. (image name in SAVI TB: SDN-image):
+
+savi-run-server m1.small SDN-image key sec-group vm-name
+
+after VM boots up, please take note of VM IP address and use it as the controller IP address in next step.
 
 ### Specifying Topology
     
@@ -49,20 +57,14 @@ desired topology.
 ```python 
 nodes = {}
 nodes["sw1"] = {'contr_addr': contr_addr, 'region':'CORE', 'flavor': 'm1.small', 'bridge_name': 'sw1_br', 'int_ip':('p1', '192.168.200.18')}
-nodes["sw2"] = {'contr_addr': contr_addr, 'region':'CORE', 'flavor': 'm1.small'}
-nodes["sw3"] = {'contr_addr': contr_addr, 'region':'CORE', 'flavor': 'm1.small', 'bridge_name': 'sw3_br'}
 nodes["h1"] = {'region':'CORE', 'flavor': 'm1.tiny'}
 nodes["h2"] = {'region':'CORE', 'flavor': 'm1.tiny'}
-nodes["h3"] = {'region':'CORE', 'flavor': 'm1.tiny'}
-nodes["h4"] = {'region':'CORE', 'flavor': 'm1.tiny'}
 ```
     4. Specify the connections between the hosts and switches.
         E.x.
 
 ```python
-topology["sw1"] = [('h1', '192.168.200.10', 'h1_br'), ('h4', '192.168.200.13')]
-topology["sw2"] = ['sw1', ('h2', '192.168.200.11')]
-topology["sw3"] = ['sw2', ('h3','192.168.200.12')]
+topology["sw1"] = [('h1', '192.168.200.10', 'h1_br'), ('h2', '192.168.200.11')]
 ```
 
 ### Running SDN Launcher
@@ -71,12 +73,17 @@ To run the SDN Launch, run the following command, in this directory:
 ./SDNLauncher
 ```
 
+###Running OF controller
+ssh to your controller VM and run OF controller.
+For instance: cd ~/ryu; ryu-manager ryu.app.simple_switch.py
+
+###Testing
  Test by SSHing to a host and pinging another host on 
         its private IP address (i.e. its 192.168... address) 
         
-### Cleaning Up
+###Cleaning Up
 
-To cleanup, call the cleanup script: **cleanup.py**.
+To cleanup, call the cleanup script: **cleanup.py VM_prefix**.
 
 ##Contact
 Khashayar Hossein Zadeh, 
