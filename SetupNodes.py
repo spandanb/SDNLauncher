@@ -177,12 +177,11 @@ The first for loop establishes the vxlands for h1 and sw3 and the second for loo
 establishes the connection to sw2
 """
 def setupSwitch(switch):
-        print "working on switch %s\n" %switch
         fixed_ip= fxdict[switch]
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(fixed_ip, username=vm_user_name, key_filename=private_key_file)
-        time.sleep(3)
+        time.sleep(15)
         # running the ovs commands
         if switch not in nodes:
             print "Switch %s was not defined in 'nodes', setting up using default ovs commands" % switch
@@ -190,7 +189,7 @@ def setupSwitch(switch):
         if 'bridge_name' in nodes[switch]:
             bridge_name = nodes[switch]['bridge_name']
         ssh.exec_command("sudo ovs-vsctl add-br %s" % bridge_name)
-        time.sleep(1)
+        time.sleep(2)
         if 'contr_addr' in nodes[switch]:
             ssh.exec_command("sudo ovs-vsctl set-controller %s tcp:%s" % (bridge_name, nodes[switch]['contr_addr']))
             time.sleep(1)
@@ -199,7 +198,6 @@ def setupSwitch(switch):
             int_ip = nodes[switch]['int_ip'][1]
             ssh.exec_command("sudo ovs-vsctl add-port %s %s -- set interface %s type=internal" % (bridge_name,int_ip_name, int_ip_name))
             time.sleep(1)     
-            ssh.exec_command("mac=`sudo ovs-vsctl get interface %s mac_in_use`;sudo ovs-vsctl set interface %s mac=\"$mac\"" % (int_ip_name,int_ip_name));
             ssh.exec_command("sudo ifconfig %s %s/24 up" %(int_ip_name, int_ip))
             time.sleep(1) 
         ssh.exec_command("sudo ovs-vsctl set-fail-mode %s secure" % bridge_name)
@@ -248,12 +246,11 @@ to/from this host. The internal IP can be set to none, in this case we do not im
 The for loop inside this function performs the exact same as the 2nd for loop inside setupSwitches
 """
 def setupHosts(host):
-        print "working on host %s\n" %host
         fixed_ip= fxdict[host]
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(fixed_ip, username=vm_user_name, key_filename=private_key_file)
-        time.sleep(3)
+        time.sleep(15)
         # running the ovs commands
         count = 0
         connectip = ''
@@ -271,10 +268,9 @@ def setupHosts(host):
                     except:
                         bridge_name = 'br%s' % count
                     ssh.exec_command("sudo ovs-vsctl add-br %s" % bridge_name)
-                    time.sleep(1)
+                    time.sleep(2)
                     ssh.exec_command("sudo ovs-vsctl add-port %s p%s -- set interface p%s type=internal" % (bridge_name,count, count))
                     time.sleep(1)
-                    ssh.exec_command("mac=`sudo ovs-vsctl get interface p%s mac_in_use`;sudo ovs-vsctl set interface p%s mac=\"$mac\"" % (count, count));
                     if (hosts[1] != "None" or hosts[1] != "none"):
                         ssh.exec_command("sudo ifconfig p%s %s/24 up" %(count, hosts[1]))
                         time.sleep(1)
@@ -358,7 +354,7 @@ if True:
                 print_msg("\nLaunching VM %d/%d on region: %s" % (i+1, numNodes, region_name))
                 c=nclient.Client(user, password, tenant_name, auth_url, region_name=region_name, no_cache=True)
                 instance_name = fixedInstancename + "%s" % (nodeName)
-                time.sleep(2)
+                time.sleep(5)
             
                 image1=nshell._find_image(c, image_name)
                 flavor1=nshell._find_flavor(c, flavor_name)
@@ -402,7 +398,8 @@ if True:
                 fxdict["%s" % (nodeName)] = s1.id
                 servers_list.append(s1)
                 table_list.append(x)
-            
+            print "Done. Now exiting."
+            sys.exit(0)
             # Wait until every VM has booted up. Checks the active/error state of the VMs
             fixed_ip = None
             srv_cnt = 0
@@ -428,7 +425,7 @@ if True:
                     print_msg("All servers are done")
                     break    
                 print_msg("server count is %s/%s " % (srv_cnt, numNodes))
-                time.sleep(3)
+                time.sleep(10)
 
             # This forloop updates our 'fxdict' dict and matches the internal ips with that node name
             tempcount = 0
@@ -517,13 +514,13 @@ if True:
                         ssh = paramiko.SSHClient()
                         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                         ssh.connect(fixed_ip, username=vm_user_name, key_filename=private_key_file)
-                        time.sleep(3)
+                        time.sleep(15)
     
                         stdin, stdout, stderr = ssh.exec_command("uptime")
                         stdin.close()
                         out1=stdout.readlines()
                         print_msg("uptime output is: %s" % (''.join(out1)))
-                        time.sleep(1)
+                        time.sleep(3)
     
                         stdin, stdout, stderr = ssh.exec_command("ping -c2 www.google.ca")
                         stdin.close()

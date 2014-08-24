@@ -177,7 +177,7 @@ The first for loop establishes the vxlands for h1 and sw3 and the second for loo
 establishes the connection to sw2
 """
 def setupSwitch(switch):
-        print "working on switch %s\n" %switch
+        print "working on switch: %s\n" %switch
         fixed_ip= fxdict[switch]
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -189,6 +189,8 @@ def setupSwitch(switch):
         bridge_name = 'br1'
         if 'bridge_name' in nodes[switch]:
             bridge_name = nodes[switch]['bridge_name']
+        ssh.exec_command("sudo ovs-vsctl del-br %s" % bridge_name)
+        time.sleep(1)
         ssh.exec_command("sudo ovs-vsctl add-br %s" % bridge_name)
         time.sleep(1)
         if 'contr_addr' in nodes[switch]:
@@ -197,7 +199,7 @@ def setupSwitch(switch):
         if 'int_ip' in nodes[switch]:
             int_ip_name = nodes[switch]['int_ip'][0]
             int_ip = nodes[switch]['int_ip'][1]
-            ssh.exec_command("sudo ovs-vsctl add-port %s %s -- set interface %s type=internal" % (bridge_name,int_ip_name, int_ip_name))
+            ssh.exec_command("sudo ovs-vsctl add-port %s %s -- set interface %s type=internal " % (bridge_name,int_ip_name, int_ip_name))
             time.sleep(1)     
             ssh.exec_command("mac=`sudo ovs-vsctl get interface %s mac_in_use`;sudo ovs-vsctl set interface %s mac=\"$mac\"" % (int_ip_name,int_ip_name));
             ssh.exec_command("sudo ifconfig %s %s/24 up" %(int_ip_name, int_ip))
@@ -226,6 +228,7 @@ def setupSwitch(switch):
                 vlni += vnlilist.count(vlni)
                 vnlilist.append(vlni)
                 connectip = fxdict[host]
+            #ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s ofport_request=%s" % (bridge_name,vlni,vlni,connectip,vlni,vlni))
             ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s" % (bridge_name,vlni,vlni,connectip,vlni))
             time.sleep(1)
         # establishes all the other connections to this switch 
@@ -248,7 +251,7 @@ to/from this host. The internal IP can be set to none, in this case we do not im
 The for loop inside this function performs the exact same as the 2nd for loop inside setupSwitches
 """
 def setupHosts(host):
-        print "working on host %s\n" %host
+        print "working on host: %s\n" %host
         fixed_ip= fxdict[host]
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -270,6 +273,8 @@ def setupHosts(host):
                             bridge_name = hosts[2]
                     except:
                         bridge_name = 'br%s' % count
+                    ssh.exec_command("sudo ovs-vsctl del-br %s" % bridge_name)
+                    time.sleep(1)
                     ssh.exec_command("sudo ovs-vsctl add-br %s" % bridge_name)
                     time.sleep(1)
                     ssh.exec_command("sudo ovs-vsctl add-port %s p%s -- set interface p%s type=internal" % (bridge_name,count, count))
@@ -355,30 +360,9 @@ if True:
                     image_name = fixedimage_name
                                     
 
-                print_msg("\nLaunching VM %d/%d on region: %s" % (i+1, numNodes, region_name))
                 c=nclient.Client(user, password, tenant_name, auth_url, region_name=region_name, no_cache=True)
                 instance_name = fixedInstancename + "%s" % (nodeName)
-                time.sleep(2)
-            
-                image1=nshell._find_image(c, image_name)
-                flavor1=nshell._find_flavor(c, flavor_name)
-
-                seclist=[]
-                seclist.append(sec_group_name)
-
-                secgroup=nshell._get_secgroup(c, sec_group_name)
-                try:
-                    c.security_group_rules.create(secgroup.id, "TCP", 22, 22, "10.0.0.0/8")
-                except:
-                    pass
-                try:
-                    c.security_group_rules.create(secgroup.id, "UDP", 4789, 4789, "10.0.0.0/8")
-                except:
-                    pass
-                try:
-                    c.security_group_rules.create(secgroup.id, "ICMP", -1, 255, "10.0.0.0/8")
-                except:
-                    pass
+                print_msg("\nTesting VM %d/%d (%s) on region: %s" % (i+1, numNodes, instance_name, region_name))
 
                 #create quantum client for floating ip address creation/association and VM network
                 quantum=qclient.Client(username=user, password=password, tenant_name=tenant_name, auth_url=auth_url, region_name=region_name)
@@ -394,9 +378,18 @@ if True:
                 v_nic['net-id']=_network_id
                 v_nic['v4-fixed-ip']=None
                 v_nics.append(v_nic)
-                hints={}
-                s1=c.servers.create(instance_name, image1, flavor1, key_name=key_name, security_groups=seclist, scheduler_hints=hints, nics=v_nics)
                 #print s1
+
+                servers=c.servers.list()
+                s1=None
+                for server in servers:
+                    if server.name == instance_name:
+                        s1 = server
+                        print "found\n"
+                        break
+                if s1 is None or s1.name != instance_name:
+                    print "cant find this server: %s\n" %instance_name
+                    sys.exit(0)
                 x.add_row(["VM ID",s1.id])
                 # note, here we do not have the internal ips. So we specify the server id with that node's name
                 fxdict["%s" % (nodeName)] = s1.id
@@ -428,7 +421,7 @@ if True:
                     print_msg("All servers are done")
                     break    
                 print_msg("server count is %s/%s " % (srv_cnt, numNodes))
-                time.sleep(3)
+                time.sleep(2)
 
             # This forloop updates our 'fxdict' dict and matches the internal ips with that node name
             tempcount = 0
@@ -467,9 +460,13 @@ if True:
             #look for network id of the external network
             _network_id = quantumv20.find_resourceid_by_name_or_id(quantum, 'network', 'ext_net')
 
-            if True:
-                s1 = servers_list[-1]
-                fixed_ip = fxdict.values()[-1]
+            print fxdict
+            wait_before_ssh=3
+            for s1 in servers_list:
+                print s1
+                #s1 = servers_list[-1]
+                #fixed_ip = fxdict.values()[-1]
+                fixed_ip = fxdict[s1.name[len(fixedInstancename):]]
                 print_msg("waiting %d seconds before ssh test" %wait_before_ssh)
                 time.sleep(wait_before_ssh)
 
@@ -517,7 +514,7 @@ if True:
                         ssh = paramiko.SSHClient()
                         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                         ssh.connect(fixed_ip, username=vm_user_name, key_filename=private_key_file)
-                        time.sleep(3)
+                        time.sleep(1)
     
                         stdin, stdout, stderr = ssh.exec_command("uptime")
                         stdin.close()
@@ -534,19 +531,20 @@ if True:
                     except:
                         print_msg("Ssh failed. If the edge is overloaded, allocate more time before the SSH check")
     
-                    print "\nPlease wait roughly %s seconds as the VxLans are being set up\n" % (numNodes*30)
+            print "\nPlease wait roughly %s seconds as the VxLans are being set up\n" % (numNodes*30)
                         
-                    # set up the controllers
-                    # the value "switch" being passed in is in the form of 'sw#'
-                    for switch in topology.keys():
-                        setupSwitch(switch) 
+            # set up the controllers
+            # the value "switch" being passed in is in the form of 'sw#'
+            for switch in topology.keys():
+                setupSwitch(switch) 
                         
-                    # set up the hosts
-                    # the value "host" being passed in is in the form of 'h#'
-                    for host in hostList:
-                        setupHosts(host)    
+            # set up the hosts
+            # the value "host" being passed in is in the form of 'h#'
+            for host in hostList:
+                setupHosts(host)    
 
-                    print "All Finished, you can now access your VMs \n\n"
+            print "All Finished, you can now access your VMs \n\n"
                         
         except:
             print "Failed to launch VMs. Check your keystone credentials"
+            raise
