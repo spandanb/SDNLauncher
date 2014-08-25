@@ -73,9 +73,33 @@ To run the SDN Launch, run the following command, in this directory:
 ./SDNLauncher
 ```
 
+Another option is to run two scripts separately; one to boot up nodes and one to setup topology:
+
+To setup nodes:
+
+```python
+./SetupNodes.py
+```
+
+To (re)setup topology:
+
+```python
+./SetupTopology.py
+```
+
+To get infomation:
+
+```python
+./GetInformation.py
+```
+
 ###Running OF controller
 ssh to your controller VM and run OF controller.
-For instance: cd ~/ryu; ryu-manager ryu.app.simple_switch.py
+For instance: 
+
+```python
+cd ~/ryu; ryu-manager ryu.app.simple_switch.py
+```
 
 ###Testing
  Test by SSHing to a host and pinging another host on 
