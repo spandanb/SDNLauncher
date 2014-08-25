@@ -91,8 +91,8 @@ for elem in hostList:
 
 
 try:
-    with open(pub_key) as f:
-        pub_key = f.read()
+    with open(private_key_file) as f:
+        private_key = f.read()
 except:
     print "cant open key file: %s" %private_key_file
     sys.exit(0)

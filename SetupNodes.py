@@ -91,8 +91,8 @@ for elem in hostList:
 
 
 try:
-    with open(pub_key) as f:
-        pub_key = f.read()
+    with open(private_key_file) as f:
+        private_key = f.read()
 except:
     print "cant open key file: %s" %private_key_file
     sys.exit(0)
@@ -307,6 +307,8 @@ fixedimage_name = image_name
 fixedflavor_name = flavor_name
 fixedInstancename = instance_name
 
+done = False
+
 if True:       
         s1 = None
         quantum = None
@@ -398,7 +400,12 @@ if True:
                 fxdict["%s" % (nodeName)] = s1.id
                 servers_list.append(s1)
                 table_list.append(x)
+            print "********************************************************"
+            print "please wait for a couple of more minutes and run ./GetInfomration.py to make sure VMs are ready"
+            print "after VMs are ready, run SetupTopology.py to setup the topology links"
+            print "********************************************************"
             print "Done. Now exiting."
+            done = True
             sys.exit(0)
             # Wait until every VM has booted up. Checks the active/error state of the VMs
             fixed_ip = None
@@ -546,4 +553,7 @@ if True:
                     print "All Finished, you can now access your VMs \n\n"
                         
         except:
-            print "Failed to launch VMs. Check your keystone credentials"
+           if done is False:
+               print "Failed to launch VMs. Check your keystone credentials"
+               raise
+               
