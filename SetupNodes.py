@@ -341,21 +341,27 @@ if True:
                             image_name = nodes[nodeName]['image']
                         else:
                             image_name = fixedimage_name
+
+                        if 'name' in nodes[nodeName]:
+                            instance_name = nodes[nodeName]['name']
+                        else:
+                            instance_name = fixedInstancename + "%s" % (nodeName)
                     else:
                         region_name = fixedRegion_name
                         flavor_name = fixedflavor_name
                         image_name = fixedimage_name
+                        instance_name = fixedInstancename + "%s" % (nodeName)
                 except:
                     print "\n\n --------- ERROR IN THE NODES DICTIONARY on key %s-------------" %nodeName
                     print " using defualt parameters to launch"
                     region_name = fixedRegion_name
                     flavor_name = fixedflavor_name
                     image_name = fixedimage_name
+                    instance_name = fixedInstancename + "%s" % (nodeName)
                                     
 
                 print_msg("\nLaunching VM %d/%d on region: %s" % (i+1, numNodes, region_name))
                 c=nclient.Client(user, password, tenant_name, auth_url, region_name=region_name, no_cache=True)
-                instance_name = fixedInstancename + "%s" % (nodeName)
                 time.sleep(5)
             
                 image1=nshell._find_image(c, image_name)
@@ -393,7 +399,17 @@ if True:
                 v_nic['v4-fixed-ip']=None
                 v_nics.append(v_nic)
                 hints={}
-                s1=c.servers.create(instance_name, image1, flavor1, key_name=key_name, security_groups=seclist, scheduler_hints=hints, nics=v_nics)
+                
+                servers=c.servers.list()
+                s1=None
+                for server in servers:
+                    if server.name == instance_name:
+                        s1 = server
+                        print "found"
+                        break
+                if s1 is None or s1.name != instance_name:
+                    print "creating VM"
+                    s1=c.servers.create(instance_name, image1, flavor1, key_name=key_name, security_groups=seclist, scheduler_hints=hints, nics=v_nics)
                 #print s1
                 x.add_row(["VM ID",s1.id])
                 # note, here we do not have the internal ips. So we specify the server id with that node's name

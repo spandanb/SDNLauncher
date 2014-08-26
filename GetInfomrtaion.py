@@ -159,6 +159,32 @@ def checkServer(server):
         if hasattr(server, "fault"):
             print_msg("error fault is " + str(getattr(server, "fault")) + "\n")
 
+def _calc_vni(node):
+    vn1 = 0
+    if node.lower().startswith('sw'):
+       vn1=node.lower()
+       vn1=int(vn1[2:]) + 500
+    elif node.lower().startswith('h'):
+       vn1=node.lower()
+       vn1=int(vn1[1:])
+    return vn1
+
+
+num_links={}
+
+def _get_vni(node1, node2):
+    vn1=_calc_vni(node1)
+    vn2=_calc_vni(node2)
+    d1=num_links.setdefault(node1, {})
+    d2=d1.setdefault(node2, 0)
+    num_links[node1][node2] += 1
+    if vn1 < vn2:
+        vn = vn1 * 16384 + vn2 * 16 + d2
+    else:
+        vn = vn2 * 16384 + vn1 * 16 + d2
+    print "%s --> %s : %s" %(node1, node2, vn)
+    return vn
+
 ports={}
 
 """
@@ -223,9 +249,10 @@ def setupSwitch(switch):
         for host in topology[switch]:
             # handle hosts 
             if isinstance(host, tuple):
-                vlni = int(host[0][1]) + int(switch[2]) + (2*numSwitches) + 10
-                vlni += vnlilist.count(vlni)
-                vnlilist.append(vlni)
+                #vlni = int(host[0][1]) + int(switch[2]) + (2*numSwitches) + 10
+                #vlni += vnlilist.count(vlni)
+                #vnlilist.append(vlni)
+                vlni = _get_vni(host[0], switch)
                 connectip = fxdict[host[0]]
                 ip_of_port = host[1] 
                 stdin, stdout, stderr = ssh.exec_command("sudo ovs-vsctl get interface vxlan%s ofport" % (vlni))
@@ -237,9 +264,10 @@ def setupSwitch(switch):
                 ports[ip_of_port]['of_port']=of_port
             # handle switches
             else: 
-                vlni = int(host[2]) + int(switch[2]) + 10
-                vlni += vnlilist.count(vlni)
-                vnlilist.append(vlni)
+                #vlni = int(host[2]) + int(switch[2]) + 10
+                #vlni += vnlilist.count(vlni)
+                #vnlilist.append(vlni)
+                vlni = _get_vni(host, switch)
                 connectip = fxdict[host]
             time.sleep(1)
         # establishes all the other connections to this switch 
@@ -247,9 +275,10 @@ def setupSwitch(switch):
             for host in topology[keys]:
                 if (host == switch):
                     connectip = fxdict[keys]
-                    vlni = int(keys[2]) + int(switch[2]) + 10 
-                    vlni += vnlilist.count(vlni)
-                    vnlilist.append(vlni)
+                    #vlni = int(keys[2]) + int(switch[2]) + 10 
+                    #vlni += vnlilist.count(vlni)
+                    #vnlilist.append(vlni)
+                    vlni = _get_vni(keys, switch)
                     #ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s" % (bridge_name, vlni, vlni,connectip, vlni))
                     stdin, stdout, stderr = ssh.exec_command("sudo ovs-vsctl get interface vxlan%s ofport" % (vlni))
                     stdin.close()
@@ -293,9 +322,10 @@ def setupHosts(host):
                     ports.setdefault(hosts[1], {})
                     ports[hosts[1]]['mac']=mac
                     connectip = fxdict[keys]
-                    vlni = int(keys[2]) + int(host[1]) + (2*numSwitches) + 10
-                    vlni += vnlilist.count(vlni)
-                    vnlilist.append(vlni)
+                    #vlni = int(keys[2]) + int(host[1]) + (2*numSwitches) + 10
+                    #vlni += vnlilist.count(vlni)
+                    #vnlilist.append(vlni)
+                    vlni = _get_vni(keys, host)
                     count += 1
         ssh.close()
 
@@ -317,6 +347,8 @@ print "\n"
 
 # holds the internal ips for each VM... key = node name, value = internal ip
 fxdict= {}
+i_name_dict={}
+vmdict={}
 # backup of the default parameters as specified inside the config.py file
 fixedRegion_name = region_name
 fixedimage_name = image_name
@@ -355,22 +387,29 @@ if True:
                             image_name = nodes[nodeName]['image']
                         else:
                             image_name = fixedimage_name
+                        if 'name' in nodes[nodeName]:
+                            instance_name = nodes[nodeName]['name']
+                        else:
+                            instance_name = fixedInstancename + "%s" % (nodeName)
                     else:
                         region_name = fixedRegion_name
                         flavor_name = fixedflavor_name
                         image_name = fixedimage_name
+                        instance_name = fixedInstancename + "%s" % (nodeName)
                 except:
                     print "\n\n --------- ERROR IN THE NODES DICTIONARY on key %s-------------" %nodeName
                     print " using defualt parameters to launch"
                     region_name = fixedRegion_name
                     flavor_name = fixedflavor_name
                     image_name = fixedimage_name
+                    instance_name = fixedInstancename + "%s" % (nodeName)
                                     
 
                 c=nclient.Client(user, password, tenant_name, auth_url, region_name=region_name, no_cache=True)
-                instance_name = fixedInstancename + "%s" % (nodeName)
-                print_msg("\nTesting VM %d/%d (%s) on region: %s" % (i+1, numNodes, instance_name, region_name))
+                #instance_name = fixedInstancename + "%s" % (nodeName)
+                print_msg("\nTesting VM %d/%d (%s / %s) on region: %s" % (i+1, numNodes, nodeName, instance_name, region_name))
 
+                i_name_dict[instance_name]=nodeName
                 #create quantum client for floating ip address creation/association and VM network
                 quantum=qclient.Client(username=user, password=password, tenant_name=tenant_name, auth_url=auth_url, region_name=region_name)
                 #look for network id of the external network
@@ -379,6 +418,7 @@ if True:
                 v_nic={}
 
                 x = PrettyTable(["Property", "Value"])
+                x.add_row(["Node", nodeName])
                 x.add_row(["VM name", instance_name])
                 x.add_row(["VM number", i+1])
                 x.add_row(["Network ID",_network_id])
@@ -399,7 +439,7 @@ if True:
                     sys.exit(0)
                 x.add_row(["VM ID",s1.id])
                 # note, here we do not have the internal ips. So we specify the server id with that node's name
-                fxdict["%s" % (nodeName)] = s1.id
+                vmdict["%s" % (nodeName)] = s1.id
                 servers_list.append(s1)
                 table_list.append(x)
             
@@ -437,8 +477,8 @@ if True:
                 if s1.status == "ACTIVE":
                    (s_net, s_ip)=s1.networks.popitem()
                    # add in the internal ip for that node 
-                   for key in fxdict:
-                        if (fxdict[key] == s1.id):
+                   for key in vmdict:
+                        if (vmdict[key] == s1.id):
                             fxdict[key] = s_ip[0]            
                    checkServer(s1)                       #-----------------------------
                    table_list[tempcount].add_row(["Host",str(getattr(s1, "OS-EXT-SRV-ATTR:host"))])
@@ -473,7 +513,7 @@ if True:
                 print s1
                 #s1 = servers_list[-1]
                 #fixed_ip = fxdict.values()[-1]
-                fixed_ip = fxdict[s1.name[len(fixedInstancename):]]
+                fixed_ip = fxdict[i_name_dict[s1.name]]
                 print_msg("waiting %d seconds before ssh test" %wait_before_ssh)
                 time.sleep(wait_before_ssh)
 
