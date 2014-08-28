@@ -185,6 +185,7 @@ def _get_vni(node1, node2):
     print "%s --> %s : %s" %(node1, node2, vn)
     return vn
 
+u_dict={}
 """
 This function takes in a switch name, in the format 'sw#', ex: 'sw1' and runs several
 ovs-vsctl commands. It starts off by adding our bridge, then sets up a controller address which the
@@ -207,7 +208,7 @@ def setupSwitch(switch):
         fixed_ip= fxdict[switch]
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(fixed_ip, username=vm_user_name, key_filename=private_key_file)
+        ssh.connect(fixed_ip, username=u_dict.get(switch, vm_user_name), key_filename=private_key_file, timeout=20)
         time.sleep(3)
         # running the ovs commands
         if switch not in nodes:
@@ -289,7 +290,7 @@ def setupHosts(host):
         fixed_ip= fxdict[host]
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(fixed_ip, username=vm_user_name, key_filename=private_key_file)
+        ssh.connect(fixed_ip, username=u_dict.get(host, vm_user_name), key_filename=private_key_file)
         time.sleep(3)
         # running the ovs commands
         count = 0
@@ -369,8 +370,10 @@ if True:
                 and set the variables before that specific VM launches
                 """
                 nodeName = nodeList[i]
+                u_name = vm_user_name
                 try:
                     if nodeName in nodes: 
+                        u_name = nodes[nodeName].get('vm_user_name', vm_user_name)
                         if 'region' in nodes[nodeName]:
                             region_name = nodes[nodeName]['region']
                         else:
@@ -403,7 +406,6 @@ if True:
                     image_name = fixedimage_name
                     instance_name = fixedInstancename + "%s" % (nodeName)
                                     
-
                 c=nclient.Client(user, password, tenant_name, auth_url, region_name=region_name, no_cache=True)
                 #instance_name = fixedInstancename + "%s" % (nodeName)
                 i_name_dict[instance_name]=nodeName
@@ -439,6 +441,7 @@ if True:
                 x.add_row(["VM ID",s1.id])
                 # note, here we do not have the internal ips. So we specify the server id with that node's name
                 vmdict["%s" % (nodeName)] = s1.id
+                u_dict[nodeName]=u_name
                 servers_list.append(s1)
                 table_list.append(x)
             
@@ -559,7 +562,7 @@ if True:
                     try:
                         ssh = paramiko.SSHClient()
                         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                        ssh.connect(fixed_ip, username=vm_user_name, key_filename=private_key_file)
+                        ssh.connect(fixed_ip, username=u_dict.get(i_name_dict[s1.name], vm_user_name), key_filename=private_key_file)
                         time.sleep(1)
     
                         stdin, stdout, stderr = ssh.exec_command("uptime")
