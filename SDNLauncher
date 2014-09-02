@@ -366,41 +366,27 @@ if True:
                 and set the variables before that specific VM launches
                 """
                 nodeName = nodeList[i]
+                server_name = None
+                u_name = vm_user_name
                 try:
                     if nodeName in nodes: 
                         u_name = nodes[nodeName].get('vm_user_name', vm_user_name)
-                        if 'region' in nodes[nodeName]:
-                            region_name = nodes[nodeName]['region']
-                        else:
-                            region_name = fixedRegion_name
-
-                        if 'flavor' in nodes[nodeName]:
-                            flavor_name = nodes[nodeName]['flavor']
-                        else:
-                            flavor_name = fixedflavor_name
-
-                        if 'image' in nodes[nodeName]:
-                            image_name = nodes[nodeName]['image']
-                        else:
-                            image_name = fixedimage_name
-                        if 'name' in nodes[nodeName]:
-                            instance_name = nodes[nodeName]['name']
-                        else:
-                            instance_name = fixedInstancename + "%s" % (nodeName)
+                        server_name = nodes[nodeName].get('server', None)
+                        region_name = nodes[nodeName].get('region', fixedRegion_name)
+                        flavor_name = nodes[nodeName].get('flavor', fixedflavor_name)
+                        image_name = nodes[nodeName].get('image', fixedimage_name)
+                        instance_name = nodes[nodeName].get('name', fixedInstancename + "%s" % (nodeName))
                     else:
                         region_name = fixedRegion_name
                         flavor_name = fixedflavor_name
                         image_name = fixedimage_name
                         instance_name = fixedInstancename + "%s" % (nodeName)
-                        u_name = vm_user_name
                 except:
                     print "\n\n --------- ERROR IN THE NODES DICTIONARY on key %s-------------" %nodeName
                     print " using defualt parameters to launch"
                     region_name = fixedRegion_name
                     flavor_name = fixedflavor_name
                     image_name = fixedimage_name
-                    u_name = vm_user_name
-                                    
 
                 print_msg("\nLaunching VM %d/%d (%s / %s) on region: %s" % (i+1, numNodes, nodeName, instance_name, region_name))
                 c=nclient.Client(user, password, tenant_name, auth_url, region_name=region_name, no_cache=True)
@@ -443,6 +429,8 @@ if True:
                 v_nic['v4-fixed-ip']=None
                 v_nics.append(v_nic)
                 hints={}
+                if server_name:
+                    hints['force_hosts']=server_name
                 s1=c.servers.create(instance_name, image1, flavor1, key_name=key_name, security_groups=seclist, scheduler_hints=hints, nics=v_nics)
                 #print s1
                 x.add_row(["VM ID",s1.id])
@@ -477,7 +465,7 @@ if True:
                     print_msg("All servers are done")
                     break    
                 print_msg("server count is %s/%s " % (srv_cnt, numNodes))
-                time.sleep(3)
+                time.sleep(6)
 
             # This forloop updates our 'fxdict' dict and matches the internal ips with that node name
             tempcount = 0

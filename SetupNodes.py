@@ -325,27 +325,15 @@ if True:
                 and set the variables before that specific VM launches
                 """
                 nodeName = nodeList[i]
+                server_name = None
                 try:
                     if nodeName in nodes: 
-                        if 'region' in nodes[nodeName]:
-                            region_name = nodes[nodeName]['region']
-                        else:
-                            region_name = fixedRegion_name
-
-                        if 'flavor' in nodes[nodeName]:
-                            flavor_name = nodes[nodeName]['flavor']
-                        else:
-                            flavor_name = fixedflavor_name
-
-                        if 'image' in nodes[nodeName]:
-                            image_name = nodes[nodeName]['image']
-                        else:
-                            image_name = fixedimage_name
-
-                        if 'name' in nodes[nodeName]:
-                            instance_name = nodes[nodeName]['name']
-                        else:
-                            instance_name = fixedInstancename + "%s" % (nodeName)
+                        u_name = nodes[nodeName].get('vm_user_name', vm_user_name)
+                        server_name = nodes[nodeName].get('server', None)
+                        region_name = nodes[nodeName].get('region', fixedRegion_name)
+                        flavor_name = nodes[nodeName].get('flavor', fixedflavor_name)
+                        image_name = nodes[nodeName].get('image', fixedimage_name)
+                        instance_name = nodes[nodeName].get('name', fixedInstancename + "%s" % (nodeName))
                     else:
                         region_name = fixedRegion_name
                         flavor_name = fixedflavor_name
@@ -399,7 +387,8 @@ if True:
                 v_nic['v4-fixed-ip']=None
                 v_nics.append(v_nic)
                 hints={}
-                
+                if server_name:
+                    hints['force_hosts']=server_name
                 servers=c.servers.list()
                 s1=None
                 for server in servers:
@@ -413,7 +402,7 @@ if True:
                 #print s1
                 x.add_row(["VM ID",s1.id])
                 # note, here we do not have the internal ips. So we specify the server id with that node's name
-                fxdict["%s" % (nodeName)] = s1.id
+                fxdict[nodeName] = s1.id
                 servers_list.append(s1)
                 table_list.append(x)
             print "********************************************************"

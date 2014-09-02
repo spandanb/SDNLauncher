@@ -29,7 +29,6 @@ key_name=''
 #private and public key file path
 #Example private key file path: '/home/savitb/user1/.ssh/id_rsa'
 private_key_file=''
-pub_key=private_key_file+".pub"
 
 #default instance properties
 image_name="image-3.0.1"
