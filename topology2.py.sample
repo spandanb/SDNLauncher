@@ -1,0 +1,15 @@
+
+contr_addr = '10.12.11.34:6633'
+
+#Holds all switches
+switches = {}
+switches["sw1"] = {'contr_addr': contr_addr, 'region':'CORE', 'flavor': 'm1.small', 'bridge_name': 'sw1_br', 'int_ip':('p1', '192.168.200.18')}
+
+#Holds all hosts
+hosts = {}
+hosts["h1"] = {'region':'CORE', 'flavor': 'm1.tiny'}
+hosts["h2"] = {'region':'CORE', 'flavor': 'm1.tiny'}
+
+topology = {}
+topology["sw1"] = [('h1', '192.168.200.10', 'h1_br'), ('h2', '192.168.200.13')]
+

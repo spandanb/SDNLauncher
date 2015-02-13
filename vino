@@ -1,0 +1,289 @@
+#!/usr/bin/env python
+
+import sys
+import time
+import pdb
+import itertools
+
+import paramiko
+import subprocess
+
+import topology2 as topology
+import config2 as config
+import novaclient.v1_1.client as nclient
+import novaclient.v1_1.shell as nshell
+from quantumclient.v2_0 import client as qclient
+from quantumclient.quantum import v2_0 as quantumv20
+from prettytable import PrettyTable
+
+def add_secrules(nova, secgroup):
+    """
+    Creates secgroup
+    parameters
+        nova:-nova client object
+    """
+    #TODO: Check rule does not exist, use secgroup.rules or nova.security_group_rules.find()
+    rules = [("TCP", 22, 22), ("UDP", 4789, 4789), ("ICMP", -1, 255)]
+    for rule in rules:
+        try:
+            nova.security_group_rules.create(secgroup.id, rule[0], rule[1], rule[2], "10.0.0.0/8")
+        except Exception as e:
+            print e.message
+
+def create_node(node, node_name, nova):
+    print "Creating " + node_name    
+    
+    #Get params
+    user_name =  node.get('vm_user_name', config.vm_user_name)
+    server_name = node.get('server', None)
+    region_name = node.get('region', config.region_name)
+    instance_name = node.get('name', config.instance_prefix + node_name)
+    #Search for image and flavor
+    flavor = nshell._find_flavor(nova, node.get('flavor', config.flavor_name))
+    image = nshell._find_image(nova, node.get('image', config.image_name))
+
+    vm=nova.servers.create(instance_name, image, flavor, key_name=config.key_name, 
+        security_groups=seclist, scheduler_hints={"force_hosts":server_name}, nics=v_nics)
+    return {"vm":vm, "status": 1, "name": node_name, 
+        "instance_name": instance_name, "user_name": user_name }
+
+def pretty_print(nodes):
+    for node_name, node in nodes.items():
+        n = node["vm"]
+        ptable = PrettyTable(["Property", "Value"])
+        ptable.add_row(["Node name",  node["name"]])
+        ptable.add_row(["VM name",    node["instance_name"]])
+        ptable.add_row(["Network ID", node["network_id"]])
+        ptable.add_row(["VM ID", n.id])
+        ptable.add_row(["Host",str(getattr(n, "OS-EXT-SRV-ATTR:host"))])
+        ptable.add_row(["Instance Name",str(getattr(n, "OS-EXT-SRV-ATTR:instance_name"))])
+        ptable.add_row(["Internal IP addr", node["ip_addr"]])
+        print ptable
+
+def check_server_status(nodes):
+    """
+    Busy loops until each server is up, or fails
+    """
+    """
+    VM status:
+       -1-error
+        0-no op
+        1-build initiated
+        2-ip address allocated
+    """
+    while True:
+        in_progress = filter(lambda h: h["status"] == 1, nodes.values())
+        if len(in_progress) == 0: return
+        print "Waiting for {} servers".format(len(in_progress))
+
+        for node in in_progress:
+            n = node["vm"]
+            n.get()
+            if n.status == "ERROR":
+                node["status"] = -1
+                print "{} completed with error".format(node["name"])
+            elif n.status == "ACTIVE":
+                node["status"] = 2
+                vm_net, vm_ip = n.networks.popitem()    
+                node["ip_addr"] = vm_ip[0]
+                node["net"] = vm_net
+                print "{} completed successfully".format(node["name"])
+            time.sleep(6)
+
+def error_check():
+    #Check 1: Private key file exists
+    try:
+        with open(private_key_file, 'r') as private_key:
+            pass
+    except:
+        print "Unable to open private key file at: '{}'".format(private_key_file)
+        sys.exit(1)
+
+def sanity_test(nodes):
+    for n in nodes.values():
+        #VM may not be up, loop until ping successful
+        while True:
+            print "Pinging {} at {}".format(n["name"], n["ip_addr"])
+            try: 
+                output=subprocess.check_output(['ping', '-c 3', n["ip_addr"] ])
+                print output
+                break
+            except Exception as e:
+                print e
+                print "Unable to ping. Trying again...."
+                time.sleep(5)
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        while True:    
+            try:
+                ssh.connect(n["ip_addr"], username=n["user_name"], key_filename=config.private_key_file)
+                break
+            except Exception as e:
+                print e
+                print "Unable to connect. Trying again...."
+                time.sleep(5)
+
+        time.sleep(3)
+
+        stdin, stdout, stderr = ssh.exec_command("uptime")
+        stdin.close()
+        out1=stdout.readlines()
+        print "uptime output is: %s" % (''.join(out1))
+        time.sleep(1)
+
+        stdin, stdout, stderr = ssh.exec_command("ping -c2 www.google.ca")
+        stdin.close()
+        out2=stdout.readlines()
+        print "ping output is: %s" % (''.join(out2))
+        ssh.close() 
+
+def _get_vm_id(node):
+    vm_id = 0
+    #Extract switch number 
+    if node.lower().startswith('sw'):
+       vm_id = int(node.lower()[2:]) * 100
+    #Extract host number
+    elif node.lower().startswith('h'):
+       vm_id = int(node.lower()[1:])
+    return vm_id
+
+def _get_vni(node1, node2):
+    #Returns same VNI between two VMs
+    vid1 = _get_vm_id(node1)
+    vid2 = _get_vm_id(node2)
+    
+    vni =  max(vid1, vid2) + min(vid1, vid2)
+    #print "%s --> %s : %s" %(node1, node2, vni)
+    return vni
+
+def setup_switches(hosts_dict, switches_dict):
+    for sw_name, sw_dict in switches_dict.items():
+        sw_prop_map = topology.switches[sw_name] #The properties of the switch  
+        sw_topo_map = topology.topology[sw_name] #The list of interconnections
+        print "setting up {}".format(sw_name)
+        
+        #ssh to VM
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(sw_dict["ip_addr"], username=sw_dict["user_name"], key_filename=config.private_key_file)
+        time.sleep(3)
+        
+        # run the ovs commands
+        bridge_name = sw_prop_map['bridge_name'] if 'bridge_name' in sw_prop_map else 'br1'
+        ssh.exec_command("sudo ovs-vsctl add-br %s" % bridge_name)
+        time.sleep(1)
+        
+        #Attach controller
+        #Default for a OVS switch, is standalone mode
+        contr_addr = sw_prop_map.get('contr_addr', topology.contr_addr)
+        if contr_addr :
+            ssh.exec_command("sudo ovs-vsctl set-controller %s tcp:%s" % (bridge_name, contr_addr))
+            time.sleep(1)
+            ssh.exec_command("sudo ovs-vsctl set-fail-mode %s secure" % bridge_name)
+            time.sleep(1)
+            ssh.exec_command("sudo ovs-vsctl set controller %s connection-mode=out-of-band"% bridge_name)
+            time.sleep(1)
+        
+        if 'int_ip' in sw_prop_map:
+            int_port, int_ip = sw_prop_map["int_ip"]
+            ssh.exec_command("sudo ovs-vsctl add-port %s %s -- set interface %s type=internal" % (bridge_name, int_port, int_port))
+            time.sleep(1)     
+            ssh.exec_command("mac=`sudo ovs-vsctl get interface %s mac_in_use`;sudo ovs-vsctl set interface %s mac=\"$mac\"" % (int_port, int_port));
+            ssh.exec_command("sudo ifconfig %s %s/24 up" %(int_port, int_ip))
+            time.sleep(1) 
+        
+        node_ip = ''# the internal ip for use in the vxlan set up
+        vni = 0 #The VNI- only VMs on the VNI can communicate
+        
+        #The iterate over nodes connected to this switch
+        for node in sw_topo_map:
+            # handle hosts 
+            if isinstance(node, tuple):
+                vni = _get_vni(node[0], sw_name)
+                node_ip = hosts_dict[node[0]]["ip_addr"]
+            # handle switches
+            else: 
+                vni = _get_vni(node, sw_name)
+                node_ip = switches_dict[node]["ip_addr"]
+            ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s" % (bridge_name, vni, vni, node_ip, vni))
+        ssh.close()
+
+def setup_hosts(hosts_dict, switches_dict):
+    for host_name, host_dict in hosts_dict.items():
+        print "setting up {}".format(host_name)
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(host_dict["ip_addr"], username=host_dict["user_name"], key_filename=config.private_key_file)
+        time.sleep(3)
+        count = 0
+
+        for sw_name, connections in topology.topology.items():
+            for h in connections:
+                if h[0] == host_name:
+                    vxlan_ip = h[1]
+                    bridge_name = h[2] if len(h) >= 3 else 'br%s' % count 
+                    
+                    # run the ovs commands
+                    ssh.exec_command("sudo ovs-vsctl add-br %s" % bridge_name)
+                    time.sleep(1)
+                    ssh.exec_command("sudo ovs-vsctl add-port %s p%s -- set interface p%s type=internal" % (bridge_name,count, count))
+                    time.sleep(1)
+                    ssh.exec_command("mac=`sudo ovs-vsctl get interface p%s mac_in_use`;sudo ovs-vsctl set interface p%s mac=\"$mac\"" % (count, count));
+                    time.sleep(1)
+                    ssh.exec_command("sudo ifconfig p%s %s/24 up" %(count, vxlan_ip))
+                   
+                    #get switch ip addr
+                    switch_ip = switches_dict[sw_name]["ip_addr"]
+
+                    vlni = _get_vni(sw_name, host_name)
+                    ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s" % (bridge_name,vlni,vlni,switch_ip, vlni))
+                    time.sleep(1)
+                    count += 1
+        ssh.close()
+
+#Delete VMs that match instance prefix
+def delete_vms(nova):
+    for s in nova.servers.list():
+        if config.instance_prefix in s.name:
+            print "Deleting " + s.name
+            s.delete()
+            
+if __name__ == "__main__":
+
+    #Create nova and quantum instance
+    nova = nclient.Client(config.username, config.password, config.tenant_name, config.auth_url, region_name=config.region_name, no_cache=True)
+    quantum = qclient.Client(username=config.username, password=config.password, tenant_name=config.tenant_name, auth_url=config.auth_url, region_name=config.region_name)
+
+    #Delete any existing VMs
+    delete_vms(nova)
+
+    #List of security groups
+    seclist = [config.sec_group_name]
+    secgroup=nshell._get_secgroup(nova, config.sec_group_name)
+    add_secrules(nova, secgroup)
+    
+    #nic
+    _network_id = quantumv20.find_resourceid_by_name_or_id(quantum, 'network', config.tenant_name+'-net')
+    v_nic = {'net-id': _network_id, 'v4-fixed-ip':None}
+    v_nics = [v_nic]
+   
+    hosts = {} #List of hosts
+    switches = {} #List of switches
+    for node_name, node in topology.hosts.items():
+        vm_dict = create_node(node, node_name, nova)
+        vm_dict["network_id"] = _network_id 
+        hosts[node_name] = vm_dict
+
+    for node_name, node in topology.switches.items():
+        vm_dict = create_node(node, node_name, nova)
+        vm_dict["network_id"] = _network_id 
+        switches[node_name] = vm_dict
+    
+    nodes = dict(hosts.items() + switches.items()) #Joint dict of al nodes
+    
+    check_server_status(nodes) #Returns when all servers are completed
+    sanity_test(nodes) #Performs ping test on newly booted vms 
+    setup_hosts(hosts, switches)    
+    setup_switches(hosts, switches) 
+    pretty_print(nodes)  #Pretty table
