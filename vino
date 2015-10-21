@@ -30,7 +30,7 @@ def add_secrules(nova, secgroup):
         except Exception as e:
             print e.message
 
-def create_node(node, node_name, nova):
+def create_node(node, node_name, nova, nics):
     print "Creating " + node_name    
     
     #Get params
@@ -43,7 +43,7 @@ def create_node(node, node_name, nova):
     image = nshell._find_image(nova, node.get('image', config.image_name))
 
     vm=nova.servers.create(instance_name, image, flavor, key_name=config.key_name, 
-        security_groups=seclist, scheduler_hints={"force_hosts":server_name}, nics=v_nics)
+        security_groups=seclist, scheduler_hints={"force_hosts":server_name}, nics=nics)
     return {"vm":vm, "status": 1, "name": node_name, 
         "instance_name": instance_name, "user_name": user_name }
 
@@ -62,9 +62,8 @@ def pretty_print(nodes):
 
 def check_server_status(nodes):
     """
-    Busy loops until each server is up, or fails
-    """
-    """
+    Busy loops until each server either is up or fails
+    
     VM status:
        -1-error
         0-no op
@@ -158,6 +157,7 @@ def _get_vni(node1, node2):
     return vni
 
 def setup_switches(hosts_dict, switches_dict):
+    #Iterate over all switches
     for sw_name, sw_dict in switches_dict.items():
         sw_prop_map = topology.switches[sw_name] #The properties of the switch  
         sw_topo_map = topology.topology[sw_name] #The list of interconnections
@@ -236,8 +236,9 @@ def setup_hosts(hosts_dict, switches_dict):
                     #get switch ip addr
                     switch_ip = switches_dict[sw_name]["ip_addr"]
 
-                    vlni = _get_vni(sw_name, host_name)
-                    ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s" % (bridge_name,vlni,vlni,switch_ip, vlni))
+                    vni = _get_vni(sw_name, host_name)
+                    ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s" % 
+                        (bridge_name,vni,vni,switch_ip, vni))
                     time.sleep(1)
                     count += 1
         ssh.close()
@@ -248,15 +249,52 @@ def delete_vms(nova):
         if config.instance_prefix in s.name:
             print "Deleting " + s.name
             s.delete()
-            
+
+#walks through the topology dict and 
+#'completes' the topology, i.e. 
+#adds the bidirectionality info in the corresponding switch
+#otherwise the vxlan tunnels are only one-way
+#NOTE: This only works for singly-homed hosts
+def complete_topology(): 
+    #A list view of a map of interconnections
+    #{sw_n: [connections], ...} -> [('sw_n', [connections] ), ...]
+    topo_list = topology.topology.items()
+    #sw_tuple == ('sw_n', [connection])
+    for idx, sw_tuple in enumerate(topo_list):
+        #pdb.set_trace()
+        #The name, and connections of this switch
+        this_sw_name, this_sw_conn = sw_tuple
+
+        #The other switches
+        other_sws = topo_list[:idx] + topo_list[idx+1:]
+
+        #Iterate over the other switches
+        for other_sw, conn in other_sws:
+           for sw in conn:
+               sw_name = sw[0] if type(sw) == tuple else sw
+
+               #Update this_sw_conn since this_sw 
+               #appears in the dict of another switch
+               if sw_name == this_sw_name and other_sw not in this_sw_conn:
+                    this_sw_conn.append(other_sw)
+        
+    topo_map = dict(topo_list)
+
 if __name__ == "__main__":
+
+    complete_topology()
+    #print "EXITING"
+    #sys.exit(0)
 
     #Create nova and quantum instance
     nova = nclient.Client(config.username, config.password, config.tenant_name, config.auth_url, region_name=config.region_name, no_cache=True)
     quantum = qclient.Client(username=config.username, password=config.password, tenant_name=config.tenant_name, auth_url=config.auth_url, region_name=config.region_name)
 
+
     #Delete any existing VMs
     delete_vms(nova)
+
+
 
     #List of security groups
     seclist = [config.sec_group_name]
@@ -264,23 +302,23 @@ if __name__ == "__main__":
     add_secrules(nova, secgroup)
     
     #nic
-    _network_id = quantumv20.find_resourceid_by_name_or_id(quantum, 'network', config.tenant_name+'-net')
-    v_nic = {'net-id': _network_id, 'v4-fixed-ip':None}
-    v_nics = [v_nic]
+    network_resource = quantumv20.find_resourceid_by_name_or_id(quantum, 'network', config.tenant_name+'-net')
+    nic = {'net-id': network_resource, 'v4-fixed-ip': None}
+    nics = [nic]
    
-    hosts = {} #List of hosts
-    switches = {} #List of switches
+    hosts = {} #map of host name to host dict
+    switches = {} #map of switch name to switch dict
     for node_name, node in topology.hosts.items():
-        vm_dict = create_node(node, node_name, nova)
-        vm_dict["network_id"] = _network_id 
+        vm_dict = create_node(node, node_name, nova, nics)
+        vm_dict["network_id"] = network_resource
         hosts[node_name] = vm_dict
 
     for node_name, node in topology.switches.items():
-        vm_dict = create_node(node, node_name, nova)
-        vm_dict["network_id"] = _network_id 
+        vm_dict = create_node(node, node_name, nova, nics)
+        vm_dict["network_id"] = network_resource 
         switches[node_name] = vm_dict
     
-    nodes = dict(hosts.items() + switches.items()) #Joint dict of al nodes
+    nodes = dict(hosts.items() + switches.items()) #Joint dict of all nodes
     
     check_server_status(nodes) #Returns when all servers are completed
     sanity_test(nodes) #Performs ping test on newly booted vms 
