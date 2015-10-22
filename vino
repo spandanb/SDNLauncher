@@ -207,6 +207,7 @@ def setup_switches(hosts_dict, switches_dict):
                 vni = _get_vni(node, sw_name)
                 node_ip = switches_dict[node]["ip_addr"]
             ssh.exec_command("sudo ovs-vsctl add-port %s vxlan%s -- set interface vxlan%s type=vxlan options:remote_ip=%s options:key=%s" % (bridge_name, vni, vni, node_ip, vni))
+            time.sleep(1)
         ssh.close()
 
 def setup_hosts(hosts_dict, switches_dict):
@@ -322,6 +323,6 @@ if __name__ == "__main__":
     
     check_server_status(nodes) #Returns when all servers are completed
     sanity_test(nodes) #Performs ping test on newly booted vms 
-    setup_hosts(hosts, switches)    
-    setup_switches(hosts, switches) 
+    setup_switches(hosts, switches)
+    setup_hosts(hosts, switches)
     pretty_print(nodes)  #Pretty table

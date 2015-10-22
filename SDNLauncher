@@ -39,7 +39,7 @@ from quantumclient.quantum import v2_0 as quantumv20
 from novaclient import exceptions
 
 from config import user, password, auth_url 
-from config import instance_name, key_name, private_key_file, pub_key, key_name
+from config import instance_name, key_name, private_key_file, key_name
 from config import image_name, flavor_name, sec_group_name, vm_user_name, wait_before_ssh
 from config import tenant_name, region_name 
 
@@ -500,9 +500,6 @@ if True:
                 print table_list[tempcount]
                 print "\n"
                 tempcount += 1
-
-            #look for network id of the external network
-            _network_id = quantumv20.find_resourceid_by_name_or_id(quantum, 'network', 'ext_net')
 
             if True:
                 s1 = servers_list[-1]
